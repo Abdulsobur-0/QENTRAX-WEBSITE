@@ -718,7 +718,20 @@ label{font-size:.62rem;font-weight:700;letter-spacing:1.5px;color:var(--text3);d
         </div>
         <div id="t-ads">
           <div id="adsList"></div>
-          <button class="btn btn-full" id="addAdBtn" style="margin-top:8px;"><i class="fas fa-plus"></i>&nbsp;Add Ad Slide</button>
+          <button class="btn btn-full" id="addAdBtn" style="margin-top:8px;"><i class="fas fa-plus"></i>&nbsp;Add Ad Slide (paste URL)</button>
+          <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
+            <div style="font-size:.65rem;font-weight:700;color:var(--text3);letter-spacing:1px;margin-bottom:6px;">OR UPLOAD IMAGE FROM YOUR LAPTOP</div>
+            <div class="fup" id="adImgUploadArea" style="padding:1rem;">
+              <i class="fas fa-image"></i>
+              <p>Click to upload image from your laptop</p>
+              <small>JPG · PNG · WEBP · saved to server</small>
+              <input type="file" id="adImgFileIn" accept="image/*">
+            </div>
+            <div class="upbar" id="adUpbar" style="margin-top:6px;"></div>
+            <div id="adUploadResult" style="margin-top:6px;font-size:.7rem;color:var(--green);font-weight:700;min-height:16px;"></div>
+            <div style="font-size:.65rem;color:var(--text3);margin-top:4px;">After uploading, the image URL fills automatically. Then click Add Ad Slide.</div>
+          </div>
+          <input type="hidden" id="lastUploadedUrl" value="">
         </div>
         <div id="t-news" style="display:none;">
           <div id="newsList"></div>
@@ -1070,7 +1083,17 @@ function renderAdmin(){
       <label>TITLE</label><input value="${esc(a.title)}" onchange="DATA.ads[${i}].title=this.value">
       <label>DESC</label><input value="${esc(a.desc)}" onchange="DATA.ads[${i}].desc=this.value">
       <label>TAG</label><input value="${esc(a.tag)}" onchange="DATA.ads[${i}].tag=this.value">
-      <label>IMAGE URL</label><input value="${esc(a.img)}" onchange="DATA.ads[${i}].img=this.value">
+      <label>IMAGE URL (or upload below)</label>
+      <input id="adImgUrl_${i}" value="${esc(a.img)}" onchange="DATA.ads[${i}].img=this.value">
+      <div style="margin-top:6px;">
+        <label style="margin-bottom:3px;">UPLOAD NEW IMAGE FROM LAPTOP</label>
+        <div class="fup" style="padding:.7rem;margin:0;" onclick="document.getElementById('adFileReplace_${i}').click()">
+          <i class="fas fa-upload" style="font-size:1rem;margin-bottom:2px;"></i>
+          <p style="font-size:.7rem;">Click to pick image from laptop</p>
+          <input type="file" id="adFileReplace_${i}" accept="image/*" style="display:none;position:absolute;opacity:0;" onchange="uploadAdImg(${i}, this)">
+        </div>
+        <div id="adReplaceResult_${i}" style="font-size:.65rem;color:var(--green);margin-top:3px;min-height:14px;"></div>
+      </div>
       <div style="display:flex;gap:4px;margin-top:8px;">
         <button class="btn btn-full" onclick="saveAd(${i})"><i class="fas fa-save"></i> Save</button>
         <button class="btn btn-r" onclick="delAd(${a.id})"><i class="fas fa-trash"></i></button>
@@ -1163,6 +1186,35 @@ async function delIns(id){
   try{ await DEL(`/api/insights/${id}`); await loadAll(); renderAdmin(); if(curPage==='data') renderData(document.getElementById('page')); toast('Deleted'); }
   catch(e){ toast('Delete failed'); }
 }
+async function uploadAdImg(i, input){
+  const file = input.files[0];
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ toast('Select an image file'); return; }
+  if(file.size > 10*1024*1024){ toast('Image too large — max 10MB'); return; }
+  const result = document.getElementById('adReplaceResult_'+i);
+  if(result) result.textContent = 'Uploading...';
+  const fd = new FormData();
+  fd.append('file', file);
+  try{
+    const res  = await fetch('/api/upload', {method:'POST', body:fd});
+    const data = await res.json();
+    if(data.ok){
+      DATA.ads[i].img = data.url;
+      const urlInput = document.getElementById('adImgUrl_'+i);
+      if(urlInput) urlInput.value = data.url;
+      if(result) result.textContent = '✓ Uploaded — click Save to apply';
+      toast('Image uploaded! Click Save.');
+    } else {
+      if(result) result.textContent = 'Failed: '+(data.error||'unknown');
+      toast('Upload failed');
+    }
+  } catch(err){
+    if(result) result.textContent = 'Upload error';
+    toast('Upload error');
+  }
+  input.value = '';
+}
+
 async function removePhoto(){
   if(!confirm('Remove profile photo?')) return;
   try{ await DEL('/api/about/photo'); DATA.about.photo=''; renderAdmin(); if(curPage==='about') renderAbout(document.getElementById('page')); toast('Photo removed'); }
@@ -1284,11 +1336,60 @@ document.getElementById('aGo').onclick=async()=>{
       document.getElementById('aPanel').style.display='block';
       renderAdmin();
       toast('Welcome, Admin!');
+
+      // ── AD IMAGE UPLOAD FROM LAPTOP ──
+      const adFileIn = document.getElementById('adImgFileIn');
+      const adUpbar  = document.getElementById('adUpbar');
+      const adResult = document.getElementById('adUploadResult');
+      const lastUrl  = document.getElementById('lastUploadedUrl');
+
+      adFileIn.addEventListener('change', async e => {
+        const file = e.target.files[0];
+        if(!file) return;
+        if(!file.type.startsWith('image/')){ toast('Select an image file'); return; }
+        if(file.size > 10*1024*1024){ toast('Image too large — max 10MB'); return; }
+
+        adResult.textContent = 'Uploading...';
+        adUpbar.style.width = '20%';
+
+        const fd = new FormData();
+        fd.append('file', file);
+
+        try{
+          const res  = await fetch('/api/upload', {method:'POST', body:fd});
+          adUpbar.style.width = '100%';
+          const data = await res.json();
+          if(data.ok){
+            lastUrl.value = data.url;
+            adResult.innerHTML = `✓ Uploaded! URL ready: <span style="color:var(--text2);word-break:break-all;">${data.url}</span>`;
+            toast('Image uploaded — now click Add Ad Slide');
+          } else {
+            adResult.textContent = 'Upload failed: '+(data.error||'unknown');
+            toast('Upload failed');
+          }
+        } catch(err){
+          adResult.textContent = 'Upload error';
+          toast('Upload error');
+        }
+        setTimeout(()=>adUpbar.style.width='0', 1200);
+        adFileIn.value = '';
+      });
+
       document.getElementById('addAdBtn').onclick=async()=>{
         const t=prompt('Ad Title:'); if(!t) return;
         const d=prompt('Description:')||'';
         const g=(prompt('Tag (e.g. HEALTHCARE):')||'GENERAL').toUpperCase();
-        const img=prompt('Image URL:')||'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&h=500&fit=crop';
+
+        // Use uploaded URL if available, otherwise ask for URL
+        let img = lastUrl.value;
+        if(!img){
+          img = prompt('Image URL (or upload an image above first):')||'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&h=500&fit=crop';
+        } else {
+          // Clear after use
+          lastUrl.value = '';
+          document.getElementById('adUploadResult').textContent = '';
+        }
+
         await POST('/api/ads',{title:t,desc:d,tag:g,img});
         await loadAll(); renderAdmin(); if(curPage==='home') renderHome(document.getElementById('page'));
         toast('Ad slide added!');
@@ -1367,6 +1468,7 @@ window.saveAd=saveAd; window.delAd=delAd;
 window.saveNews=saveNews; window.delNews=delNews;
 window.saveSec=saveSec; window.delSec=delSec;
 window.saveIns=saveIns; window.delIns=delIns;
+window.uploadAdImg=uploadAdImg;
 </script>
 </body>
 </html>

@@ -12,7 +12,7 @@ BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
 ALLOWED_EXT   = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 MAX_MB        = 10
-ADMIN_PASS    = 'qentrax2025'   # ← Admin password is set to qentrax2025
+ADMIN_PASS    = 'qentrax2025'
 
 app.config['MAX_CONTENT_LENGTH'] = MAX_MB * 1024 * 1024
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -219,7 +219,7 @@ def init_db():
                 'Founder & CEO, Qentrax Africa',
                 'Qentrax Africa is building the digital infrastructure for a new Nigeria. We specialize in AI-powered SaaS solutions across healthcare, education, governance, and commerce.\n\nFounded in Ilorin, Kwara State, and building for the whole continent.',
                 'Flask,FastAPI,React,MySQL,PostgreSQL,AI/ML,Python,SaaS',
-                ''
+                '/static/uploads/profile_abdulsobur.jpg'
             )
         )
 
@@ -237,6 +237,11 @@ def init_db():
         ])
 
     conn.commit()
+
+    # Always update photo to profile photo if currently empty
+    cur.execute("UPDATE about SET photo='/static/uploads/profile_abdulsobur.jpg' WHERE id=1 AND (photo IS NULL OR photo='')")
+    conn.commit()
+
     cur.close()
     conn.close()
     print('✓ MySQL database ready')
