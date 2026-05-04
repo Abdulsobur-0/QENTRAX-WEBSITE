@@ -19,11 +19,12 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # ── MYSQL CONFIG ──────────────────────────────────────────────────────────────
 DB_CONFIG = {
-    'host':     'localhost',
-    'user':     'root',
-    'password': 'Stonefufu1@',
-    'database': 'qentrax_db',
-    'charset':  'utf8mb4',
+    'host': os.getenv('MYSQLHOST'),
+    'user': os.getenv('MYSQLUSER'),
+    'password': os.getenv('MYSQLPASSWORD'),
+    'database': os.getenv('MYSQLDATABASE'),
+    'port': int(os.getenv('MYSQLPORT', 3306)),
+    'charset': 'utf8mb4',
     'autocommit': False,
     'connection_timeout': 30,
 }
